@@ -1,6 +1,8 @@
-# ihtowifi wpu.h 
+# This is a direct copy-paste of /devices/device.h with {} replaced by [] and ()
+StatusLabels = {}
 
-StatusLabels = [("Outside temp (°C)", "outside-temp_c"),
+# ihtowifi wpu.h 
+StatusLabels['WPU'] = [("Outside temp (°C)", "outside-temp_c"),
     ("Boiler temp down (°C)", "boilertemp-down_c"),
     ("Boiler temp up (°C)", "boilertemp-up_c"),
     ("Evaporator temp (°C)", "evaporator-temp_c"),

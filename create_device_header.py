@@ -19,6 +19,7 @@ import slugify
 # import "hand translated" StatusLabels
 import handmadelabels
 
+
 # globals
 
 # Read from mdb file:
@@ -155,7 +156,7 @@ def print_ithoStatusLabels(show_index=True):
     for idx, label in enumerate(StatusLabelNames):
         try:
             # replace with the "old" handmade translation
-            desc, slug = handmadelabels.StatusLabels[idx]
+            desc, slug = handmadelabels.StatusLabels[PRODUCT][idx]
         except IndexError:
             # new key/value!
             desc, slug = Labels[label]
@@ -165,6 +166,15 @@ def print_ithoStatusLabels(show_index=True):
         else:
             print(f'    {{"{desc}", "{slug}"}},')
     print('    }; // EDIT THIS!')
+
+
+
+def print_status_map():
+    max_fw = max(fw_versions['datalabels'])
+    r = f'const uint8_t *itho{PRODUCT}StatusMap[] = {{' 
+    for idx in range(max_fw+1):
+        r += f'itho_{PRODUCT}status{idx}, ' if idx in fw_versions['datalabels'] else 'nullptr, '
+    print(r+'}; // EDIT THIS!')   
 
 
 #
@@ -220,17 +230,28 @@ def print_ithoSettingLabels(show_index=False):
             print(f"    \"{desc}\",\t//{idx}".expandtabs(70))
         else:
             print(f"    \"{desc}\",")
+    print('    }; // EDIT THIS!')
 
+
+def print_settings_map():
+    max_fw = max(fw_versions['settings'])
+    r = f'const uint16_t *itho{PRODUCT}SettingsMap[] = {{' 
+    for idx in range(max_fw+1):
+        r += f'itho_{PRODUCT}setting{idx}, ' if idx in fw_versions['settings'] else 'nullptr, '
+    print(r+'}; // EDIT THIS!')   
 
 if __name__ == '__main__':
     print("//DEBUG: ", PRODUCT)
     read_mdb()
-    print("//DEBUG: ", fw_versions)
+    #print("//DEBUG: ", fw_versions)
     print_itho_settings_lines()
     print()
     print_ithoSettingLabels(show_index=True)
     print()
-    print("// diff StatusLabels against wpu.h. Only 8_9 11_17 and 18_19 are different. All keys should be the same")
     print_itho_status_lines()
     print()
     print_ithoStatusLabels(show_index=False)
+    print()
+    print_settings_map()
+    print()
+    print_status_map()
