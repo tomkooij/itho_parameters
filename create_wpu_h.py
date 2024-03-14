@@ -129,14 +129,14 @@ def create_lookup_table_statuslabels():
                 unit = ""
             else:
                 unit = " ("+gb_unit+")"
-            desc = gb_tekst+unit
+            desc = (gb_tekst+unit).capitalize()
             # create a slug. Hand generated slugs use C instead of degc for temperature units
             slug = str(slugify.slugify(desc)).replace('degc', 'c')
             Labels[name] = (desc,slug)
     return Labels
 
 
-def print_ithoWPUStatusLabels():
+def print_ithoWPUStatusLabels(show_index=True):
     # print the StatusLabels, import the handmade translations first
     #  generate new one from tekst_gb if new
 
@@ -144,7 +144,7 @@ def print_ithoWPUStatusLabels():
     Labels = create_lookup_table_statuslabels()
 
     print("const struct ithoLabels ithoWPUStatusLabels[]{ \t//index".expandtabs(120))
-    for idx,label in enumerate(StatusLabelNames):
+    for idx, label in enumerate(StatusLabelNames):
         try:
             # replace with the "old" handmade translation
             desc, slug = handmadelabels.StatusLabels[idx]
@@ -152,7 +152,11 @@ def print_ithoWPUStatusLabels():
             # new key/value!
             desc, slug = Labels[label]
             print('// new label: ', desc, slug)
-        print(f'    {{"{desc}", "{slug}"}},\t//{idx}'.expandtabs(120))
+        if show_index:
+            print(f'    {{"{desc}", "{slug}"}},\t//{idx}'.expandtabs(120))
+        else:
+            print(f'    {{"{desc}", "{slug}"}},')
+    print('    };')
 
 
 #
@@ -168,4 +172,4 @@ if __name__ == '__main__':
     print("// diff StatusLabels against wpu.h. Only 8_9 11_17 and 18_19 are different. All keys should be the same")
     print_itho_WPU_status_lines()
     print()
-    print_ithoWPUStatusLabels()
+    print_ithoWPUStatusLabels(show_index=False)
