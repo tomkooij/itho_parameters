@@ -1,31 +1,39 @@
-PARFILE = ".\parameters_HeatPump.mdb"
-PASSWORD = 'itho_parameters'
-MDB = PARFILE
+PRODUCT = 'WPU' 
+DATABASE = f".\{PRODUCT}.mdb"
+
+try:
+    from password import PASSWORD
+except ImportError:
+    print('Please fill in the password in password.py')
+    PASSWORD = 'foobar'
+
+# Win32 specific?
 DRV = '{Microsoft Access Driver (*.mdb, *.accdb)}'
 
 
 import pyodbc, re
 from collections import defaultdict
 import slugify
-# import "hand translated" StatusLabels
 
+
+# import "hand translated" StatusLabels
 import handmadelabels
-handmadelabels.StatusLabels[:5]
 
 # globals
 
 # Read from mdb file:
-# WPUStatusLabels[2][:3]  Labels for firware '2' first 3 rows:
+# StatusLabels[2][:3]  Labels for firware '2' first 3 rows:
 # [(0, 'T_out', 'Buitentemp', '°C', None, None),
 # (1, 'T_BoilDwn', 'Boiler laag', '°C', None, None),
 # (2, 'T_BoilTop', 'Boiler hoog', '°C', None, None)]
-WPUStatusLabels = defaultdict(list)
+StatusLabels = defaultdict(list)
 # Setting labels per firmware version:
-WPUSettingsLabels = defaultdict(list)
+SettingsLabels = defaultdict(list)
 fw_versions = {} # fw_versions['datalabel'] = [2, 4, ... 34, 37, 41]
 
 # Translated labels, to export into wpu.h
 StatusLabelNames = []
+SettingLabelNames = []
 
 #
 # Read MDB
@@ -37,9 +45,9 @@ def get_version(s):
     return int(x[0])
 
 
-def read_mdb(DRV=DRV, PARFILE=PARFILE, PASSWORD=PASSWORD):
+def read_mdb(DRV=DRV, DATABASE=DATABASE, PASSWORD=PASSWORD):
     # connect to db
-    conn = pyodbc.connect(f'DRIVER={DRV};DBQ={PARFILE};PWD={PASSWORD}')
+    conn = pyodbc.connect(f'DRIVER={DRV};DBQ={DATABASE};PWD={PASSWORD}')
     conn.setencoding("UTF-8")
     conn.setdecoding(pyodbc.SQL_CHAR, encoding="UTF-8")
     cur = conn.cursor()
@@ -47,13 +55,9 @@ def read_mdb(DRV=DRV, PARFILE=PARFILE, PASSWORD=PASSWORD):
 
     tables = []
     for table_info in cur.tables(tableType="TABLE"):
-        if re.match("^(VersieBeheer|Data[Ll]abel|Parameterlijst|Handbed|Counters)", table_info.table_name):
+        if re.match("^(VersieBeheer|Data[Ll]abel|Parameterlijst)", table_info.table_name):
             tables.append(table_info.table_name)
     Versies = []
-
-    StatusLabelNames = []  # "Naam" column in DataLabel_Vxx tables StatusLabelName['T_out'] = 0
-    StatusLabels = {}  # StatusLabels['T_out'] = ('Outside Temp (C)', 'outside-temp-c') 
-
 
     for table in sorted(tables):
         #print(table)
@@ -63,24 +67,23 @@ def read_mdb(DRV=DRV, PARFILE=PARFILE, PASSWORD=PASSWORD):
             cur.execute(f"select Index, Naam, Tekst_NL, Tekst_GB, Eenheid_NL, Eenheid_GB from {table}") 
             rows = cur.fetchall()
             for r in sorted(rows):
-                WPUSettingsLabels[fw_ver].append((r.Index, r.Naam, r.Tekst_NL, r.Eenheid_NL, r.Tekst_GB, r.Eenheid_GB))
+                SettingsLabels[fw_ver].append((r.Index, r.Naam, r.Tekst_NL, r.Eenheid_NL, r.Tekst_GB, r.Eenheid_GB))
         if re.match("^Data[Ll]abel", table):
             fw_ver = get_version(table)
             cur.execute(f"select Index, Naam, Tekst_NL, Tekst_GB, Eenheid_NL, Eenheid_GB from {table}")
             rows = cur.fetchall()
             for r in sorted(rows):
-                WPUStatusLabels[fw_ver].append((r.Index, r.Naam, r.Tekst_NL, r.Eenheid_NL, r.Tekst_GB, r.Eenheid_GB))          
+                StatusLabels[fw_ver].append((r.Index, r.Naam, r.Tekst_NL, r.Eenheid_NL, r.Tekst_GB, r.Eenheid_GB))          
         if re.match("^VersieBeheer", table):
-            cur.execute(f"select VersieNummer, DataLabel, ParameterLijst, Handbed, Counters from {table}")
+            cur.execute(f"select VersieNummer, DataLabel, ParameterLijst from {table}")
             rows = cur.fetchall()
             for r in sorted(rows):
-                Versies.append((r.VersieNummer, r.DataLabel, r.ParameterLijst, r.Handbed, r.Counters))        
-    #sorted(WPUSettingsLabels.keys()), sorted(WPUStatusLabels.keys())    
+                Versies.append((r.VersieNummer, r.DataLabel, r.ParameterLijst))        
                 
     DataLabels = {}
     SettingLabels = {}
     for versie in Versies:
-        fw, datalabel, setting, handbed, counter = versie
+        fw, datalabel, setting = versie
         DataLabels[datalabel] = datalabel
         SettingLabels[setting] = setting
 
@@ -89,29 +92,33 @@ def read_mdb(DRV=DRV, PARFILE=PARFILE, PASSWORD=PASSWORD):
     fw_versions['settings'] = sorted([int(x) for x in SettingLabels.keys()])
     
 
+def ithowifi_slugify(s):
+    return str(slugify.slugify(s)).replace('degc', 'c').replace('/', '_')
+    
+
 #
 # StatusLabels
 # 
-def itho_WPU_status_line(fw_ver, l):
+def itho_status_line(fw_ver, l):
     # const uint8_t itho_WPUstatus42[]{0, 1, 255};
     indices_str = ', '.join(str(x) for x in l)
-    return f'const uint8_t itho_WPUstatus{fw_ver}[]{{{indices_str}, 255}};'
+    return f'const uint8_t itho_{PRODUCT}status{fw_ver}[]{{{indices_str}, 255}};'
 
 
 # Generate the index tables 'itho_WPUstatus' from the parameter tables
-def print_itho_WPU_status_lines():
+def print_itho_status_lines():
     for fw_ver in fw_versions['datalabels']:
         fw_ver = int(fw_ver)
         #print(fw_ver)
         label_list = []
-        for label in WPUStatusLabels[fw_ver]:
+        for label in StatusLabels[fw_ver]:
             idx, name, _,_,_,_ = label
             #print(idx, name)
             if name not in StatusLabelNames:
                 StatusLabelNames.append(name)
             list_idx = StatusLabelNames.index(name)
             label_list.append(list_idx)
-        print(itho_WPU_status_line(fw_ver, label_list))
+        print(itho_status_line(fw_ver, label_list))
 
 
 def create_lookup_table_statuslabels():
@@ -119,7 +126,7 @@ def create_lookup_table_statuslabels():
 
     # create lookup tabel for Statuslabels, based on most recent firmware
     for fw in fw_versions['datalabels']:
-        for label in WPUStatusLabels[fw]:
+        for label in StatusLabels[fw]:
             idx, name, nl_tekst, nl_unit, gb_tekst, gb_unit = label
             #print(name, gb_tekst, gb_unit)
             if gb_tekst is None:
@@ -129,21 +136,22 @@ def create_lookup_table_statuslabels():
                 unit = ""
             else:
                 unit = " ("+gb_unit+")"
-            desc = (gb_tekst+unit).capitalize()
+            desc = gb_tekst.capitalize()
+            desc += unit
             # create a slug. Hand generated slugs use C instead of degc for temperature units
-            slug = str(slugify.slugify(desc)).replace('degc', 'c')
-            Labels[name] = (desc,slug)
+            slug = ithowifi_slugify(desc)
+            Labels[name] = (desc.replace('/', '_'), slug)
     return Labels
 
 
-def print_ithoWPUStatusLabels(show_index=True):
+def print_ithoStatusLabels(show_index=True):
     # print the StatusLabels, import the handmade translations first
     #  generate new one from tekst_gb if new
 
     # Lookup table 'Naam' -> ('tekst_gb', 'eenheid_gb')
     Labels = create_lookup_table_statuslabels()
 
-    print("const struct ithoLabels ithoWPUStatusLabels[]{ \t//index".expandtabs(120))
+    print(f"const struct ithoLabels itho{PRODUCT}StatusLabels[]{{")
     for idx, label in enumerate(StatusLabelNames):
         try:
             # replace with the "old" handmade translation
@@ -151,25 +159,78 @@ def print_ithoWPUStatusLabels(show_index=True):
         except IndexError:
             # new key/value!
             desc, slug = Labels[label]
-            print('// new label: ', desc, slug)
+            #print('// new label: ', desc, slug)
         if show_index:
             print(f'    {{"{desc}", "{slug}"}},\t//{idx}'.expandtabs(120))
         else:
             print(f'    {{"{desc}", "{slug}"}},')
-    print('    };')
+    print('    }; // EDIT THIS!')
 
 
 #
 # SettingLabels        
 #
+def itho_setting_line(fw_ver, l):
+    indices = ', '.join(str(x) for x in l)
+    return f'const uint16_t itho_{PRODUCT}setting{fw_ver}[]{{{indices}, 999}};'
+
+def print_itho_settings_lines():
+    for fw_ver in fw_versions['settings']:
+        fw_ver = int(fw_ver)
+        #print(fw_ver)
+        label_list = []
+        for label in SettingsLabels[fw_ver]:
+            idx, name, _, _, _, _ = label
+            #print(idx, name)
+            if name not in SettingLabelNames:
+                SettingLabelNames.append(name)
+            list_idx = SettingLabelNames.index(name)
+            label_list.append(list_idx)
+        print(itho_setting_line(fw_ver, label_list))
 
 
+def create_lookup_table_settings():
+    Labels = {}
+
+    # create lookup tabel for Statuslabels, based on most recent firmware
+    for fw in fw_versions['settings']:
+        for label in SettingsLabels[fw]:
+            idx, name, nl_tekst, nl_unit, gb_tekst, gb_unit = label
+            #print(name, gb_tekst, gb_unit)
+            if gb_tekst is None:
+                gb_tekst = nl_tekst
+                gb_unit = nl_unit
+            if gb_unit is None:
+                unit = ""
+            else:
+                unit = " ("+gb_unit+")"
+            desc = gb_tekst.capitalize()
+            desc += unit
+            Labels[name] = desc.replace('/', '_')
+    return Labels
+
+
+def print_ithoSettingLabels(show_index=False):
+    
+    Labels = create_lookup_table_settings()
+    print(f"const char *itho{PRODUCT}SettingsLabels[] = {{")
+    for idx,label in enumerate(SettingLabelNames):
+        desc = Labels[label]
+        if show_index:
+            print(f"    \"{desc}\",\t//{idx}".expandtabs(70))
+        else:
+            print(f"    \"{desc}\",")
 
 
 if __name__ == '__main__':
+    print("//DEBUG: ", PRODUCT)
     read_mdb()
     print("//DEBUG: ", fw_versions)
-    print("// diff StatusLabels against wpu.h. Only 8_9 11_17 and 18_19 are different. All keys should be the same")
-    print_itho_WPU_status_lines()
+    print_itho_settings_lines()
     print()
-    print_ithoWPUStatusLabels(show_index=False)
+    print_ithoSettingLabels(show_index=True)
+    print()
+    print("// diff StatusLabels against wpu.h. Only 8_9 11_17 and 18_19 are different. All keys should be the same")
+    print_itho_status_lines()
+    print()
+    print_ithoStatusLabels(show_index=False)
