@@ -83,15 +83,21 @@ def read_mdb(DRV=DRV, DATABASE=DATABASE, PASSWORD=PASSWORD):
                 
     DataLabels = {}
     SettingLabels = {}
+    Hardware = []
+
     for versie in Versies:
         fw, datalabel, setting = versie
-        DataLabels[datalabel] = datalabel
-        SettingLabels[setting] = setting
+        DataLabels[int(fw)] = int(datalabel)
+        SettingLabels[int(fw)] = int(setting)
+        Hardware.append(int(fw))
 
     # fw_versions is global
-    fw_versions['datalabels'] = sorted([int(x) for x in DataLabels.keys()])
-    fw_versions['settings'] = sorted([int(x) for x in SettingLabels.keys()])
-    
+    fw_versions['datalabels'] = sorted([int(x) for x in DataLabels.values()])
+    fw_versions['settings'] = sorted([int(x) for x in SettingLabels.values()])
+    fw_versions['fw_vs_datalabels'] = DataLabels
+    fw_versions['fw_vs_settinglabels'] = SettingLabels
+    fw_versions['hardware'] = sorted(Hardware)
+
 
 def ithowifi_slugify(s):
     return str(slugify.slugify(s)).replace('degc', 'c').replace('/', '_')
@@ -173,7 +179,7 @@ def print_status_map():
     max_fw = max(fw_versions['datalabels'])
     r = f'const uint8_t *itho{PRODUCT}StatusMap[] = {{' 
     for idx in range(max_fw+1):
-        r += f'itho_{PRODUCT}status{idx}, ' if idx in fw_versions['datalabels'] else 'nullptr, '
+        r += f"itho_{PRODUCT}status{fw_versions['fw_vs_datalabels'][idx]}, " if idx in fw_versions['hardware'] else 'nullptr, '
     print(r+'}; // EDIT THIS!')   
 
 
@@ -237,7 +243,7 @@ def print_settings_map():
     max_fw = max(fw_versions['settings'])
     r = f'const uint16_t *itho{PRODUCT}SettingsMap[] = {{' 
     for idx in range(max_fw+1):
-        r += f'itho_{PRODUCT}setting{idx}, ' if idx in fw_versions['settings'] else 'nullptr, '
+        r += f"itho_{PRODUCT}setting{fw_versions['fw_vs_settinglabels'][idx]}, " if idx in fw_versions['hardware'] else 'nullptr, '
     print(r+'}; // EDIT THIS!')   
 
 if __name__ == '__main__':
