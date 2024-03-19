@@ -1,19 +1,10 @@
 PRODUCT = 'WPU' 
-DATABASE = f".\{PRODUCT}.mdb"
-
-try:
-    from password import PASSWORD
-except ImportError:
-    print('Please fill in the password in password.py')
-    PASSWORD = 'foobar'
-
-# Win32 specific?
-DRV = '{Microsoft Access Driver (*.mdb, *.accdb)}'
+DATABASE = f".\{PRODUCT}.sqlite"
 
 
-import pyodbc, re
+import sqlite3
 from collections import defaultdict
-import slugify
+import re, slugify
 
 
 # import "hand translated" StatusLabels
@@ -22,7 +13,7 @@ import handmadelabels
 
 # globals
 
-# Read from mdb file:
+# Read from sqlite file:
 # StatusLabels[2][:3]  Labels for firware '2' first 3 rows:
 # [(0, 'T_out', 'Buitentemp', '°C', None, None),
 # (1, 'T_BoilDwn', 'Boiler laag', '°C', None, None),
@@ -46,45 +37,45 @@ def get_version(s):
     return int(x[0])
 
 
-def read_mdb(DRV=DRV, DATABASE=DATABASE, PASSWORD=PASSWORD):
+def read_db(DATABASE=DATABASE):
     # connect to db
-    conn = pyodbc.connect(f'DRIVER={DRV};DBQ={DATABASE};PWD={PASSWORD}')
-    conn.setencoding("UTF-8")
-    conn.setdecoding(pyodbc.SQL_CHAR, encoding="UTF-8")
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row  # index by column name
     cur = conn.cursor()
 
-
     tables = []
-    for table_info in cur.tables(tableType="TABLE"):
-        if re.match("^(VersieBeheer|Data[Ll]abel|Parameterlijst)", table_info.table_name):
-            tables.append(table_info.table_name)
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';");
+    for table_info in cur.fetchall():
+        if re.match("^(VersieBeheer|Data[Ll]abel|Parameterlijst)", table_info[0]):
+            tables.append(table_info[0])
+   
     Versies = []
-
     for table in sorted(tables):
         #print(table)
         
         if re.match("^Parameterlijst", table):
             fw_ver = get_version(table)
-            cur.execute(f"select Index, Naam, Tekst_NL, Tekst_GB, Eenheid_NL, Eenheid_GB from {table}") 
+            cur.execute(f"SELECT `Index`, `Naam`, `Tekst_NL`, `Tekst_GB`, `Eenheid_NL`, `Eenheid_GB` FROM {table}") 
             rows = cur.fetchall()
-            for r in sorted(rows):
-                SettingsLabels[fw_ver].append((r.Index, r.Naam, r.Tekst_NL, r.Eenheid_NL, r.Tekst_GB, r.Eenheid_GB))
+            for r in rows:
+                SettingsLabels[fw_ver].append((r['Index'], r['Naam'], r['Tekst_NL'], r['Eenheid_NL'], r['Tekst_GB'], r['Eenheid_GB']))
+            SettingsLabels[fw_ver].sort()         
         if re.match("^Data[Ll]abel", table):
             fw_ver = get_version(table)
-            cur.execute(f"select Index, Naam, Tekst_NL, Tekst_GB, Eenheid_NL, Eenheid_GB from {table}")
+            cur.execute(f"SELECT `Index`, `Naam`, `Tekst_NL`, `Tekst_GB`, `Eenheid_NL`, `Eenheid_GB` FROM {table}") 
             rows = cur.fetchall()
-            for r in sorted(rows):
-                StatusLabels[fw_ver].append((r.Index, r.Naam, r.Tekst_NL, r.Eenheid_NL, r.Tekst_GB, r.Eenheid_GB))          
+            for r in rows:
+                StatusLabels[fw_ver].append((r['Index'], r['Naam'], r['Tekst_NL'], r['Eenheid_NL'], r['Tekst_GB'], r['Eenheid_GB']))
+            StatusLabels[fw_ver].sort()
         if re.match("^VersieBeheer", table):
-            cur.execute(f"select VersieNummer, DataLabel, ParameterLijst from {table}")
+            cur.execute(f"SELECT `VersieNummer`, `DataLabel`, `ParameterLijst` FROM {table}")
             rows = cur.fetchall()
-            for r in sorted(rows):
-                Versies.append((r.VersieNummer, r.DataLabel, r.ParameterLijst))        
+            for r in rows:
+                Versies.append((r['VersieNummer'], r['DataLabel'], r['ParameterLijst']))      
                 
     DataLabels = {}
     SettingLabels = {}
     Hardware = []
-
     for versie in Versies:
         fw, datalabel, setting = versie
         DataLabels[int(fw)] = int(datalabel)
@@ -248,7 +239,7 @@ def print_settings_map():
 
 if __name__ == '__main__':
     print("//DEBUG: ", PRODUCT)
-    read_mdb()
+    read_db()
     #print("//DEBUG: ", fw_versions)
     print_itho_settings_lines()
     print()
@@ -256,7 +247,7 @@ if __name__ == '__main__':
     print()
     print_itho_status_lines()
     print()
-    print_ithoStatusLabels(show_index=False)
+    print_ithoStatusLabels(show_index=True)
     print()
     print_settings_map()
     print()
