@@ -83,12 +83,12 @@ def read_db(DATABASE=DATABASE):
         Hardware.append(int(fw))
 
     # fw_versions is global
-    fw_versions['datalabels'] = sorted([int(x) for x in DataLabels.values()])
-    fw_versions['settings'] = sorted([int(x) for x in SettingLabels.values()])
+    fw_versions['datalabels'] = sorted(set([int(x) for x in DataLabels.values()]))  # unique
+    fw_versions['settings'] = sorted(set([int(x) for x in SettingLabels.keys()]))  
     fw_versions['fw_vs_datalabels'] = DataLabels
     fw_versions['fw_vs_settinglabels'] = SettingLabels
     fw_versions['hardware'] = sorted(Hardware)
-
+   
 
 def ithowifi_slugify(s):
     return str(slugify.slugify(s)).replace('degc', 'c').replace('/', '_')
@@ -105,6 +105,8 @@ def itho_status_line(fw_ver, l):
 
 # Generate the index tables 'itho_WPUstatus' from the parameter tables
 def print_itho_status_lines():
+    # print: ... const uint8_t itho_WPUstatusxx[]{0, 1, ..., 255};
+    print(fw_versions['datalabels'])
     for fw_ver in fw_versions['datalabels']:
         fw_ver = int(fw_ver)
         #print(fw_ver)
@@ -240,7 +242,6 @@ def print_settings_map():
 if __name__ == '__main__':
     print("//DEBUG: ", PRODUCT)
     read_db()
-    #print("//DEBUG: ", fw_versions)
     print_itho_settings_lines()
     print()
     print_ithoSettingLabels(show_index=True)
@@ -252,3 +253,4 @@ if __name__ == '__main__':
     print_settings_map()
     print()
     print_status_map()
+
