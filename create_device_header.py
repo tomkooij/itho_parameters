@@ -106,7 +106,6 @@ def itho_status_line(fw_ver, l):
 # Generate the index tables 'itho_WPUstatus' from the parameter tables
 def print_itho_status_lines():
     # print: ... const uint8_t itho_WPUstatusxx[]{0, 1, ..., 255};
-    print(fw_versions['datalabels'])
     for fw_ver in fw_versions['datalabels']:
         fw_ver = int(fw_ver)
         #print(fw_ver)
@@ -164,7 +163,7 @@ def print_ithoStatusLabels(show_index=True):
             print(f'    {{"{desc}", "{slug}"}},\t//{idx}'.expandtabs(120))
         else:
             print(f'    {{"{desc}", "{slug}"}},')
-    print('    }; // EDIT THIS!')
+    print('    };')
 
 
 
@@ -173,7 +172,7 @@ def print_status_map():
     r = f'const uint8_t *itho{PRODUCT}StatusMap[] = {{' 
     for idx in range(max_fw+1):
         r += f"itho_{PRODUCT}status{fw_versions['fw_vs_datalabels'][idx]}, " if idx in fw_versions['hardware'] else 'nullptr, '
-    print(r+'}; // EDIT THIS!')   
+    print(r+'};')
 
 
 #
@@ -229,7 +228,7 @@ def print_ithoSettingLabels(show_index=False):
             print(f"    \"{desc}\",\t//{idx}".expandtabs(70))
         else:
             print(f"    \"{desc}\",")
-    print('    }; // EDIT THIS!')
+    print('    };')
 
 
 def print_settings_map():
@@ -237,10 +236,10 @@ def print_settings_map():
     r = f'const uint16_t *itho{PRODUCT}SettingsMap[] = {{' 
     for idx in range(max_fw+1):
         r += f"itho_{PRODUCT}setting{fw_versions['fw_vs_settinglabels'][idx]}, " if idx in fw_versions['hardware'] else 'nullptr, '
-    print(r+'}; // EDIT THIS!')   
+    print(r+'};')
 
 if __name__ == '__main__':
-    print("//DEBUG: ", PRODUCT)
+    print("// Product: ", PRODUCT)
     read_db()
     print_itho_settings_lines()
     print()
