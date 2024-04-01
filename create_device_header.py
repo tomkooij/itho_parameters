@@ -1,4 +1,5 @@
-PRODUCT = 'WPU' 
+#PRODUCT = 'WPU' 
+PRODUCT = 'Autotemp'
 DATABASE = f".\{PRODUCT}.sqlite"
 
 
@@ -58,7 +59,8 @@ def read_db(DATABASE=DATABASE):
             cur.execute(f"SELECT `Index`, `Naam`, `Tekst_NL`, `Tekst_GB`, `Eenheid_NL`, `Eenheid_GB` FROM {table}") 
             rows = cur.fetchall()
             for r in rows:
-                SettingsLabels[fw_ver].append((r['Index'], r['Naam'], r['Tekst_NL'], r['Eenheid_NL'], r['Tekst_GB'], r['Eenheid_GB']))
+                if r['Tekst_NL'] is not None: # skip empty line
+                    SettingsLabels[fw_ver].append((r['Index'], r['Naam'], r['Tekst_NL'], r['Eenheid_NL'], r['Tekst_GB'], r['Eenheid_GB']))
             SettingsLabels[fw_ver].sort()         
         if re.match("^Data[Ll]abel", table):
             fw_ver = get_version(table)
@@ -76,6 +78,12 @@ def read_db(DATABASE=DATABASE):
     DataLabels = {}
     SettingLabels = {}
     Hardware = []
+    if len(Versies) == 0:
+        # geen Versies tabel
+        #print('// NO VERSION INFORMATION FOUND !!!')
+        for versie in sorted(StatusLabels.keys()):
+            Versies.append((versie, versie, versie))
+
     for versie in Versies:
         fw, datalabel, setting = versie
         DataLabels[int(fw)] = int(datalabel)
